@@ -100,6 +100,15 @@ main { max-width: 1240px; margin: 0 auto; padding: 14px 24px 60px; }
 .coin img { width: 17px; height: 17px; }
 .empty { color: var(--muted); padding: 40px 0; font-size: 17px; }
 
+/* Cards view: a card's text beside it while the mouse rests on it */
+.peek { position: fixed; z-index: 15; top: 0; left: 0; width: 330px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: hidden; padding: 14px 16px 15px; border-radius: 6px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #152133, #0c1520); box-shadow: 0 18px 44px rgba(0, 0, 0, .6); pointer-events: none; animation: peek .12s ease; }
+.peek.golden { border-color: rgba(232, 196, 106, .75); }
+.peek.prismatic { border-color: rgba(134, 228, 255, .6); }
+.peek h3 { margin: 4px 0 2px; font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: .03em; line-height: 1.2; }
+.peek .rules { margin-top: 8px; font-size: 14.5px; }
+.peek .tags { margin-top: 10px; }
+@keyframes peek { from { opacity: 0; transform: translateY(3px); } }
+
 /* Text view: one row per card, its rules beside it */
 .rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 12px; }
 .row { display: grid; grid-template-columns: 84px 1fr; gap: 14px; padding: 12px; text-align: left; border-radius: 6px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(21, 33, 51, .85), rgba(14, 23, 36, .85)); }
@@ -244,6 +253,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   <div id="list"></div>
 </main>
 <footer id="footer"></footer>
+<div class="peek" id="peek" hidden aria-hidden="true"></div>
 <div class="page" id="page" hidden role="dialog" aria-modal="true" aria-labelledby="page-title"></div>
 <script src="data.js"></script>
 <script>
@@ -495,6 +505,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   }
 
   function renderList() {
+    hidePeek();
     $("view").hidden = $("golden").hidden = false;
     if (state.cat === "keywords") {
       const shown = GLOSSARY.filter(k => !state.search || (k.keyword + "\n" + k.meaning).toLowerCase().includes(state.search));
@@ -588,12 +599,15 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     state.page = e ? { entry: e, golden: form === "golden" } : null;
     render(); renderPage();
   }
-  // Opening a page adds a step to the browser's history, so Back closes it; moving between
-  // pages, forms and tabs replaces it.
-  function openPage(e, golden, push) {
+  // Opening a page adds one step to the browser's history, so Back closes it; moving between
+  // pages (the arrows, a merge's cards), forms and tabs replaces that step, so Close and Back
+  // always return to the list.
+  function openPage(e, golden) {
+    const push = !state.page;
+    hidePeek();
     state.page = { entry: e, golden: golden && !!e.golden };
     if (push) history.pushState({ page: true }, "", hashFor(e, golden)); else history.replaceState(history.state, "", hashFor(e, golden));
-    if (push && state.cat !== e.cat) { state.cat = e.cat; state.faction = ""; state.tier = 0; state.prismatic = false; render(); }
+    if (state.cat !== e.cat) { state.cat = e.cat; state.faction = ""; state.tier = 0; state.prismatic = false; render(); }
     renderPage();
   }
   function closePage() {
@@ -603,7 +617,35 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   }
   function step(by) {
     const e = state.page.entry, nav = state.shown.includes(e) ? state.shown : entries[e.cat];
-    openPage(nav[(nav.indexOf(e) + by + nav.length) % nav.length], state.page.golden, false);
+    openPage(nav[(nav.indexOf(e) + by + nav.length) % nav.length], state.page.golden);
+  }
+
+  // --- Cards view: a card's text beside it while the mouse rests on it ---------------------
+  const peek = $("peek");
+  let peeking = null, mouse = null;
+  function hidePeek() { peeking = null; peek.hidden = true; }
+  function showPeek(t) {
+    const e = state.shown[+t.dataset.i]; if (!e) return;
+    const c = shownContent(e);
+    peeking = t;
+    peek.className = ["peek", c.rank === "Golden" ? "golden" : "", e.prismatic ? "prismatic" : ""].join(" ");
+    peek.innerHTML = `${kicker(e, c)}<h3>${escapeHtml(c.title)}</h3>${statline(c)}<div class="rules">${rulesHtml(c, false)}</div>${tagsHtml(c)}`;
+    peek.hidden = false;
+    // Beside the card, right or left; under or over it where neither side has room.
+    const r = t.querySelector(".face").getBoundingClientRect(), w = peek.offsetWidth, h = peek.offsetHeight, gap = 12, edge = 12;
+    let x = r.right + gap, y = r.top;
+    if (x + w > innerWidth - edge) x = r.left - gap - w;
+    if (x < edge) {
+      x = Math.min(Math.max(edge, r.left + r.width / 2 - w / 2), innerWidth - edge - w);
+      y = r.bottom + gap + h <= innerHeight - edge ? r.bottom + gap : r.top - gap - h;
+    }
+    peek.style.left = `${x}px`;
+    peek.style.top = `${Math.max(edge, Math.min(y, innerHeight - edge - h))}px`;
+  }
+  // After the list redraws (G turns golden on), the card under the mouse shows again.
+  function repeek() {
+    const t = mouse && document.elementFromPoint(mouse[0], mouse[1]);
+    if (t && t.closest(".tile")) showPeek(t.closest(".tile"));
   }
 
   // --- Input ----------------------------------------------------------------------------------
@@ -614,8 +656,9 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   });
   $("filters").addEventListener("click", ev => {
     const b = ev.target.closest(".chip"); if (!b) return;
-    if (b.dataset.faction !== undefined) state.faction = b.dataset.faction;
-    else if (b.dataset.tier !== undefined) state.tier = +b.dataset.tier;
+    // A chip that is already on turns off again.
+    if (b.dataset.faction !== undefined) state.faction = state.faction === b.dataset.faction ? "" : b.dataset.faction;
+    else if (b.dataset.tier !== undefined) state.tier = state.tier === +b.dataset.tier ? 0 : +b.dataset.tier;
     else if (b.dataset.prismatic !== undefined) state.prismatic = !state.prismatic;
     renderFilters(); renderList();
   });
@@ -632,17 +675,31 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   $("list").addEventListener("click", ev => {
     const b = ev.target.closest("[data-i]"); if (!b) return;
     const e = state.shown[+b.dataset.i];
-    if (e) openPage(e, state.golden, true);
+    if (e) openPage(e, state.golden);
   });
+  $("list").addEventListener("pointerover", ev => {
+    if (ev.pointerType !== "mouse") return;
+    const t = ev.target.closest(".tile");
+    if (t !== peeking) { if (t) showPeek(t); else hidePeek(); }
+  });
+  // A scroll hides the text; the next move over a card brings it back.
+  $("list").addEventListener("pointermove", ev => {
+    if (ev.pointerType !== "mouse") return;
+    mouse = [ev.clientX, ev.clientY];
+    const t = !peeking && ev.target.closest(".tile");
+    if (t) showPeek(t);
+  }, { passive: true });
+  $("list").addEventListener("pointerleave", () => { mouse = null; hidePeek(); });
+  window.addEventListener("scroll", hidePeek, { passive: true });
   $("page").addEventListener("click", ev => {
     if (ev.target === ev.currentTarget || ev.target.closest("[data-close]")) { closePage(); return; }
     const s = ev.target.closest("[data-step]"); if (s) { step(+s.dataset.step); return; }
-    const f = ev.target.closest("[data-form]"); if (f) { openPage(state.page.entry, f.dataset.form === "golden", false); return; }
+    const f = ev.target.closest("[data-form]"); if (f) { openPage(state.page.entry, f.dataset.form === "golden"); return; }
     const g = ev.target.closest("[data-goto]");
     if (g) {
       const [cat, key, form] = g.dataset.goto.split("/");
       const e = entries[cat].find(x => x.key === key);
-      if (e) openPage(e, form === "golden", true);
+      if (e) openPage(e, form === "golden");
     }
   });
   document.addEventListener("keydown", ev => {
@@ -652,11 +709,11 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
       if (ev.key === "Escape") closePage();
       else if (ev.key === "ArrowLeft") step(-1);
       else if (ev.key === "ArrowRight") step(1);
-      else if ((ev.key === "g" || ev.key === "G") && state.page.entry.golden) openPage(state.page.entry, !state.page.golden, false);
+      else if ((ev.key === "g" || ev.key === "G") && state.page.entry.golden) openPage(state.page.entry, !state.page.golden);
       else return;
       ev.preventDefault();
     } else if (ev.key === "/") { ev.preventDefault(); $("search").focus(); }
-    else if ((ev.key === "g" || ev.key === "G") && state.cat === "units") { state.golden = !state.golden; render(); }
+    else if ((ev.key === "g" || ev.key === "G") && state.cat === "units") { state.golden = !state.golden; render(); repeek(); }
   });
   window.addEventListener("popstate", fromHash);
 

@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a111b">
+<title>Prismatic Pact Gallery</title>
+<link rel="icon" href="icons/StardustIcon.webp">
+<!--
+  The web gallery: every unit, hero, augment and spell of one patch, for looking cards up
+  while playing. data.js (written by PublishGallery.ps1) holds the catalogue the game ships
+  (Data/gallery.json), the keyword glossary and the paintings' versions. This page only
+  presents them, mirroring the game's own presentation (DescriptionText, TooltipContent).
+-->
+<style>
+@font-face { font-family: "Cinzel"; src: url("Cinzel.ttf") format("truetype"); font-weight: 400 900; font-display: swap; }
+:root {
+  --ink: #0a111b; --ink-2: #0e1724; --panel: #111b29; --panel-2: #152133;
+  --line: rgba(185, 154, 98, .32); --line-strong: rgba(185, 154, 98, .7);
+  --brass: #b99a62; --gold: #dfbd7c; --warm: #f2d8a2; --golden: #e8c46a;
+  --text: #f0e6d4; --muted: #a7b5c6; --dim: #7d8a9c; --prism: #bcdff0; --mana: #9cc8ff; --blessing: #e2c4f2;
+  --spectrum: conic-gradient(from 210deg, #ff9ab8, #ffd479, #a6f0a0, #86e4ff, #ae9fff, #ff9ab8);
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; color: var(--text); font: 16px/1.5 var(--body);
+  background: radial-gradient(120% 70% at 50% -10%, #1a2a40 0%, var(--ink) 55%) fixed, var(--ink);
+}
+body.locked { overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--warm); outline-offset: 2px; }
+img { display: block; }
+
+/* Header */
+header.top { max-width: 1240px; margin: 0 auto; padding: 28px 24px 8px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 24px; }
+.brand { font-family: var(--display); font-weight: 600; letter-spacing: .14em; font-size: 30px; line-height: 1.1; margin: 0; }
+.brand small { display: block; font-size: 13px; letter-spacing: .32em; color: var(--gold); font-weight: 700; margin-bottom: 4px; }
+.patch { margin-left: auto; text-align: right; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.patch b { color: var(--warm); font-weight: normal; }
+.rule { height: 1px; background: linear-gradient(90deg, transparent, var(--line-strong) 12%, var(--line-strong) 88%, transparent); }
+
+/* Tabs, search and switches stay at hand while scrolling */
+.bar { position: sticky; top: 0; z-index: 5; background: rgba(10, 17, 27, .94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.bar-in { max-width: 1240px; margin: 0 auto; padding: 10px 24px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px 5px; font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .08em; color: var(--muted); }
+.tab span { color: var(--dim); font-family: var(--body); font-size: 12px; letter-spacing: 0; margin-left: 4px; }
+.tab[aria-selected="true"] { color: var(--warm); border-bottom-color: var(--gold); }
+.tools { display: flex; gap: 8px; align-items: center; flex: 1 1 320px; min-width: 0; justify-content: flex-end; }
+.search { flex: 1 1 200px; max-width: 340px; min-width: 0; height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--ink-2); }
+.search::placeholder { color: var(--dim); }
+.search:focus { border-color: var(--line-strong); outline: none; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; flex: none; }
+.seg button { background: none; border: 0; padding: 0 12px; height: 34px; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: rgba(223, 189, 124, .14); color: var(--warm); }
+.golden-toggle { flex: none; height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line); background: none; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+.golden-toggle[aria-pressed="true"] { color: #1b1305; background: linear-gradient(180deg, #f6dc94, #d9a947); border-color: #f2d27f; }
+
+main { max-width: 1240px; margin: 0 auto; padding: 14px 24px 60px; }
+.filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px; border: 1px solid var(--line); background: var(--ink-2); color: var(--muted); font-size: 13px; white-space: nowrap; }
+.chip img { width: 16px; height: 16px; }
+.chip[aria-pressed="true"] { color: var(--ink); background: var(--gold); border-color: var(--gold); }
+.chip.tier { font-family: var(--display); font-weight: 700; min-width: 40px; justify-content: center; }
+.chip.prism[aria-pressed="true"] { background: var(--spectrum); border-color: transparent; color: #101826; }
+.count { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
+.count:empty { display: none; }
+
+/* Grid */
+.section-h { display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .16em; color: var(--gold); text-transform: uppercase; }
+.section-h::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.section-h span { color: var(--dim); font-family: var(--body); font-weight: normal; letter-spacing: 0; text-transform: none; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 16px 12px; }
+.grid.square { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+.tile { position: relative; display: flex; flex-direction: column; gap: 7px; padding: 0; background: none; border: 0; text-align: left; min-width: 0; }
+.face { position: relative; display: block; padding: 1.5px; border-radius: 6px; background: linear-gradient(160deg, rgba(232, 200, 140, .75), rgba(120, 96, 58, .5)); box-shadow: 0 6px 16px rgba(0, 0, 0, .45); transition: transform .15s ease, box-shadow .15s ease; }
+.face img, .face .blank { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 5px; background: var(--panel); }
+.square .face img, .square .face .blank { aspect-ratio: 1; }
+.tile:hover .face, .tile:focus-visible .face { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(0, 0, 0, .55); }
+.tile.golden .face { background: linear-gradient(160deg, #fff1c0, #e8b84e 45%, #8c6420); box-shadow: 0 6px 18px rgba(232, 184, 78, .28); }
+.tile.prismatic .face { padding: 2px; background: var(--spectrum); box-shadow: 0 6px 18px rgba(134, 228, 255, .2); }
+.tile-name { font-size: 13.5px; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pip { position: absolute; top: 7px; left: 7px; min-width: 24px; height: 22px; padding: 0 6px; border-radius: 3px; display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .04em; color: var(--warm); background: rgba(6, 10, 16, .82); border: 1px solid rgba(185, 154, 98, .55); }
+.fac { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #0d141e; border: 1.5px solid var(--tint, var(--gold)); box-shadow: 0 0 0 1.5px rgba(5, 8, 13, .9); }
+.fac img { width: 17px; height: 17px; }
+.stat-row { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; justify-content: space-between; pointer-events: none; }
+.stat { min-width: 28px; height: 24px; padding: 0 7px; border-radius: 12px; display: grid; place-items: center; font-weight: bold; font-size: 14px; background: rgba(6, 10, 16, .85); border: 1px solid; font-variant-numeric: tabular-nums; }
+.stat.pow { color: #ffd98a; border-color: rgba(255, 217, 138, .55); }
+.stat.hp { color: #ff9c8f; border-color: rgba(255, 156, 143, .55); }
+.coin { position: absolute; bottom: 6px; right: 6px; display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px 0 4px; border-radius: 12px; background: rgba(6, 10, 16, .85); border: 1px solid rgba(232, 196, 106, .55); color: var(--golden); font-weight: bold; font-size: 14px; }
+.coin img { width: 17px; height: 17px; }
+.empty { color: var(--muted); padding: 40px 0; font-size: 17px; }
+
+/* Text view: one row per card, its rules beside it */
+.rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 12px; }
+.row { display: grid; grid-template-columns: 84px 1fr; gap: 14px; padding: 12px; text-align: left; border-radius: 6px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(21, 33, 51, .85), rgba(14, 23, 36, .85)); }
+.row:hover { border-color: var(--line-strong); }
+.row .face { align-self: start; }
+.row.golden { border-color: rgba(232, 196, 106, .6); }
+.row.prismatic { border-color: rgba(188, 223, 240, .5); }
+.row .face img, .row .face .blank { aspect-ratio: 3 / 4; }
+.row.square-art .face img, .row.square-art .face .blank { aspect-ratio: 1; }
+.row h3 { margin: 2px 0 2px; font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: .03em; line-height: 1.25; }
+.row .rules { font-size: 14.5px; }
+
+/* Shared text pieces */
+.kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-family: var(--display); font-weight: 700; font-size: 11.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.kicker img { width: 16px; height: 16px; }
+.kicker .rank-golden { color: var(--golden); }
+.kicker .rank-prismatic { color: var(--prism); }
+.statline { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 4px; font-size: 14px; color: var(--muted); }
+.statline b { font-size: 16px; color: var(--text); margin-right: 3px; }
+.statline .p b { color: #ffd98a; } .statline .h b { color: #ff9c8f; }
+.rules { color: var(--text); line-height: 1.5; }
+.rules p { margin: 0 0 8px; }
+.rules p:last-child { margin-bottom: 0; }
+.trigger { font-family: var(--display); font-weight: 700; font-size: 12.5px; letter-spacing: .1em; color: var(--gold); text-transform: uppercase; margin-right: 4px; }
+.trigger.blessing { color: var(--blessing); }
+.price { display: inline-flex; align-items: center; gap: 3px; color: var(--mana); font-weight: bold; font-size: 14px; margin-left: 6px; vertical-align: -2px; }
+.price img { width: 15px; height: 15px; }
+.tagline { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+.ico { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -.22em; margin: 0 1px; }
+u.scale { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+u.scale.gold { color: var(--warm); }
+.kw { color: var(--warm); }
+.note { color: var(--dim); font-size: 13px; margin: 10px 0 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag { padding: 3px 10px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.tag.cost { color: var(--golden); border-color: rgba(232, 196, 106, .5); }
+
+/* A card's page */
+.page { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4, 7, 12, .78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.page[hidden] { display: none; }
+.sheet { position: relative; width: min(1120px, 100%); max-height: 100%; display: flex; flex-direction: column; border-radius: 8px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #121d2d, #0b131e); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); overflow: hidden; }
+.sheet-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.sheet-bar .pos { color: var(--dim); font-size: 13px; min-width: 64px; text-align: center; }
+.icon-btn { width: 36px; height: 36px; border-radius: 4px; border: 1px solid var(--line); background: var(--ink-2); display: grid; place-items: center; font-size: 20px; line-height: 1; color: var(--muted); }
+.icon-btn:hover { color: var(--warm); border-color: var(--line-strong); }
+.sheet-bar .grow { flex: 1; }
+.sheet-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); min-height: 0; overflow: auto; }
+.illus { margin: 0; padding: 20px; display: flex; align-items: flex-start; justify-content: center; background: radial-gradient(80% 60% at 50% 40%, rgba(223, 189, 124, .08), transparent); }
+.illus img, .illus .blank { width: 100%; max-height: 74vh; object-fit: contain; border-radius: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.illus .blank { aspect-ratio: 3 / 4; background: var(--panel); }
+.illus.golden img { box-shadow: 0 0 0 2px #e8b84e, 0 10px 34px rgba(232, 184, 78, .3); }
+.illus.prismatic img { box-shadow: 0 0 0 2px #86e4ff, 0 10px 34px rgba(134, 228, 255, .25); }
+.page-text { padding: 22px 26px 28px 6px; }
+.page-text h2 { margin: 8px 0 6px; font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: .04em; line-height: 1.15; }
+.page-text .divider { height: 1px; margin: 14px 0; background: linear-gradient(90deg, var(--line-strong), transparent); }
+.page-text .rules { font-size: 16.5px; }
+.page-text .rules p { margin-bottom: 11px; }
+.merge { margin-top: 18px; padding: 12px; border-radius: 6px; border: 1px solid rgba(188, 223, 240, .3); background: rgba(188, 223, 240, .04); }
+.merge-h { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .16em; margin-bottom: 10px; }
+.merge-h span:first-child { color: var(--prism); }
+.merge-h span:last-child { color: var(--golden); }
+.merge-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.merge-row .op { color: var(--prism); font-size: 20px; }
+.mini { width: 84px; padding: 0; background: none; border: 0; text-align: center; font-size: 12px; line-height: 1.25; color: var(--text); }
+.mini .face { margin-bottom: 5px; }
+.mini.golden .face { background: linear-gradient(160deg, #fff1c0, #e8b84e 45%, #8c6420); }
+.mini.prismatic .face { background: var(--spectrum); }
+.mini.here { opacity: .55; cursor: default; }
+.glossary { margin-top: 18px; display: grid; gap: 8px; }
+.glossary h4, .page-text h4 { margin: 0 0 2px; font-family: var(--display); font-size: 11.5px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
+.gloss { font-size: 14px; color: var(--muted); }
+.gloss b { color: var(--warm); font-weight: normal; }
+
+/* The keyword list */
+.keywords { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.keyword { padding: 14px 16px; border-radius: 6px; border: 1px solid var(--line); background: rgba(21, 33, 51, .6); }
+.keyword h3 { margin: 0 0 4px; font-family: var(--display); font-size: 15px; letter-spacing: .08em; color: var(--warm); font-weight: 700; }
+.keyword p { margin: 0; color: var(--text); font-size: 15px; }
+
+footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--dim); font-size: 13px; }
+
+@media (max-width: 760px) {
+  header.top { padding: 18px 16px 6px; }
+  .brand { font-size: 22px; }
+  .brand small { font-size: 11px; }
+  .patch { margin-left: 0; text-align: left; font-size: 12px; }
+  .bar-in { padding: 8px 16px; gap: 8px; }
+  .tabs { width: 100%; margin: 0 -4px; }
+  .tab { padding: 6px 8px 5px; font-size: 13px; }
+  .tools { flex-basis: 100%; }
+  .search { flex-basis: 0; max-width: none; }
+  .seg button { padding: 0 9px; }
+  .golden-toggle { padding: 0 10px; }
+  main { padding: 10px 16px 48px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .grid, .grid.square { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+  .tile-name { font-size: 12.5px; }
+  .pip { top: 5px; left: 5px; min-width: 21px; height: 19px; font-size: 10px; }
+  .fac { top: 4px; right: 4px; width: 22px; height: 22px; }
+  .fac img { width: 14px; height: 14px; }
+  .stat-row { left: 4px; right: 4px; bottom: 4px; }
+  .stat { min-width: 22px; height: 20px; padding: 0 5px; font-size: 12px; }
+  .coin { height: 20px; font-size: 12px; bottom: 4px; right: 4px; }
+  .coin img { width: 14px; height: 14px; }
+  .row { grid-template-columns: 64px 1fr; gap: 12px; padding: 10px; }
+  .page { padding: 0; }
+  .sheet { width: 100%; height: 100%; max-height: none; border-radius: 0; border: 0; }
+  .sheet-body { display: block; }
+  .illus { padding: 14px 16px 4px; }
+  .illus img, .illus .blank { width: auto; max-width: 100%; max-height: 48vh; }
+  .illus .blank { width: 60%; }
+  .page-text { padding: 10px 16px 32px; }
+  .page-text h2 { font-size: 23px; }
+  .page-text .rules { font-size: 16px; }
+  footer { padding: 0 16px 32px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 class="brand"><small>Prismatic Pact</small>Gallery</h1>
+  <div class="patch" id="patch"></div>
+</header>
+<div class="rule"></div>
+<div class="bar">
+  <div class="bar-in">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Categories"></nav>
+    <div class="tools">
+      <input class="search" id="search" type="search" placeholder="Search a name or an effect" autocomplete="off" spellcheck="false" aria-label="Search">
+      <div class="seg" id="view" role="group" aria-label="View">
+        <button type="button" data-view="cards" aria-pressed="true">Cards</button>
+        <button type="button" data-view="text" aria-pressed="false">Text</button>
+      </div>
+      <button type="button" class="golden-toggle" id="golden" aria-pressed="false" title="Show units as their golden merge (G)">Golden</button>
+    </div>
+  </div>
+</div>
+<main>
+  <div class="filters" id="filters"></div>
+  <p class="count" id="count" aria-live="polite"></p>
+  <div id="list"></div>
+</main>
+<footer id="footer"></footer>
+<div class="page" id="page" hidden role="dialog" aria-modal="true" aria-labelledby="page-title"></div>
+<script src="data.js"></script>
+<script>
+"use strict";
+(() => {
+  const DATA = window.PACT_GALLERY;
+  if (!DATA) { document.getElementById("list").innerHTML = '<p class="empty">The catalogue (data.js) is missing. Make the site with PublishGallery.ps1.</p>'; return; }
+  const SITE = DATA.site, G = DATA.gallery;
+  const $ = id => document.getElementById(id);
+
+  // --- The game's presentation, mirrored -----------------------------------------------
+  // DescriptionText.Icons: the resource a {icon:Name} token draws.
+  const ICONS = { Mana: "ManaIcon", Devotion: "DevotionIcon", Stardust: "StardustIcon", Growth: "GrowthIcon", Cultivation: "CultivationIcon",
+    ShadowEssence: "ShadowEssenceIcon", Voltage: "VoltageIcon", Gold: "Gold", Sunlight: "Sunlight", Power: "PowerIcon" };
+  // CardFace.FactionIcon and FactionTint.
+  const factionIcon = f => f.includes("Mage") ? "ManaIcon" : f.includes("Cultist") ? "DevotionIcon" : f.includes("Spirit") ? "StardustIcon"
+    : f.includes("Ninja") ? "ShadowEssenceIcon" : f.includes("Dragon") ? "GrowthIcon" : f.includes("Cloudstriker") ? "VoltageIcon"
+    : f.includes("Sylvan") ? "CultivationIcon" : null;
+  const TINTS = { ManaIcon: "#7fa8ff", DevotionIcon: "#e0607e", StardustIcon: "#7fe8ff", ShadowEssenceIcon: "#b48cf0", GrowthIcon: "#8fd67a",
+    PowerIcon: "#f2d26b", CultivationIcon: "#9bd97a", VoltageIcon: "#ffd75a" };
+  // GalleryEntries: the faction filter's order; units with none are Unaligned.
+  const FACTIONS = ["Mage", "Cultist", "Sylvan", "Spirit", "Dragon", "Dragonkin", "Ninja", "Cloudstriker", "Letter", "Unaligned"];
+  const UNALIGNED = "Unaligned", PRISMATIC = "Prismatic", OTHER = "Summoned and evolved", EPIC = "Epic heroes · from the hero gallery spell";
+  const numeral = n => ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][n] || String(n);
+
+  const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // DisplayText.Readable: one known mis-decoded multiplication sign.
+  const readable = s => s.replace(/Ã—/g, "×");
+  // DescriptionText.Plain: the words without markup.
+  const plain = s => s.replace(/\[\/?(?:b|u|i)\]/g, "").replace(/\{icon:([A-Za-z]+)\}/g, (m, n) => n === "ShadowEssence" ? "Shadow Essence" : n);
+  const icon = (name, cls = "ico") => `<img class="${cls}" src="icons/${name}.webp" alt="">`;
+
+  // KeywordGlossary.For: whole words, plurals allowed, in order of first appearance; Speed
+  // joins when a unit is faster or slower than the default.
+  const GLOSSARY = SITE.glossary || [];
+  const glossaryRe = GLOSSARY.length ? new RegExp(GLOSSARY.map(e => `\\b(${escapeRe(e.keyword)})s?\\b`).join("|"), "gi") : null;
+  function keywordsFor(description, speed) {
+    const found = [], seen = new Set();
+    if (glossaryRe) for (const m of plain(description).matchAll(glossaryRe)) {
+      const word = m.slice(1).find(Boolean).toLowerCase();
+      const entry = GLOSSARY.find(e => e.keyword.toLowerCase() === word);
+      if (entry && !seen.has(word)) { seen.add(word); found.push(entry); }
+    }
+    if (speed != null && speed !== 100 && !seen.has("speed")) { const s = GLOSSARY.find(e => e.keyword === "Speed"); if (s) found.push(s); }
+    return found;
+  }
+
+  // DescriptionText.Rich + TooltipContent.Lit: [b], [u] and [i] pass through, every other
+  // bracket is literal, icons draw, and the card's keywords are lit. Augments set their
+  // scaling numbers in warm gold (DescriptionText.Scaling).
+  function rich(text, content) {
+    const words = content.keywords.length ? new RegExp(content.keywords.map(k => `\\b${escapeRe(k.keyword)}s?\\b`).join("|"), "gi") : null;
+    const meaning = new Map(content.keywords.map(k => [k.keyword.toLowerCase(), k.meaning]));
+    let html = "";
+    for (const part of text.split(/(\[\/?(?:b|u|i)\]|\{icon:[A-Za-z]+\})/)) {
+      if (!part) continue;
+      const tag = part.match(/^\[(\/?)(b|u|i)\]$/);
+      if (tag) { html += tag[2] === "u" ? (tag[1] ? "</u>" : `<u class="scale${content.kind === "AUGMENT" ? " gold" : ""}">`) : `<${tag[1]}${tag[2]}>`; continue; }
+      const token = part.match(/^\{icon:([A-Za-z]+)\}$/);
+      if (token) { html += ICONS[token[1]] ? `<img class="ico" src="icons/${ICONS[token[1]]}.webp" alt="${token[1]}">` : escapeHtml(token[1]); continue; }
+      if (!words) { html += escapeHtml(part); continue; }
+      let last = 0;
+      for (const m of part.matchAll(words)) {
+        const key = m[0].toLowerCase().replace(/s$/, "");
+        const tip = meaning.get(key) || meaning.get(m[0].toLowerCase()) || "";
+        html += escapeHtml(part.slice(last, m.index)) + `<span class="kw" title="${escapeHtml(tip)}">${escapeHtml(m[0])}</span>`;
+        last = m.index + m[0].length;
+      }
+      html += escapeHtml(part.slice(last));
+    }
+    return html;
+  }
+
+  // TooltipContent.Sections: the rules split at their bold triggers ("Engage:"), standalone
+  // tags ("Unique") as their own parts, and a special action's price beside its heading.
+  function sections(body) {
+    const out = []; let waiting = null;
+    for (const raw of body.replace(/\r/g, "").split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (waiting !== null) { out.push({ trigger: waiting, text: line }); waiting = null; continue; }
+      let m = line.match(/^\[b\]\s*([^\[]+?)\s*\[\/b\]$/);
+      if (m) { const v = m[1].trim(); if (v.endsWith(":")) waiting = v.replace(/:+$/, ""); else out.push({ tag: true, text: v }); continue; }
+      if ((m = line.match(/^(Blessing of [A-Za-z]+):\s*(.*)$/))) { out.push({ trigger: m[1], text: m[2].trim(), blessing: true }); continue; }
+      if ((m = line.match(/^\[b\]\s*([^\[\]]+?(?:\[[^\]]*\][^\[\]]*?)?):\s*\[\/b\]\s*(.*)$/))) { out.push({ trigger: m[1].trim(), text: m[2].trim() }); continue; }
+      out.push({ text: line });
+    }
+    if (waiting !== null) out.push({ trigger: waiting, text: "" });
+    for (let i = out.length - 1; i > 0; i--) {
+      const m = !out[i].trigger && !out[i].tag && out[i].text.match(/^-\s*(?:\[u\])?(\d+)(?:\[\/u\])?\s*\{icon:([A-Za-z]+)\}$/);
+      if (m && out[i - 1].trigger && !out[i - 1].cost) { out[i - 1].cost = { amount: +m[1], icon: m[2] }; out.splice(i, 1); }
+    }
+    return out;
+  }
+  const isMergeLine = s => !s.trigger && !s.tag && /^Prismatic Merges with (.+) into (.+?)\.?$/.test(plain(s.text).trim());
+
+  // TooltipLooks.Rules: each trigger in small capitals over its effect, a short value beside it.
+  function rulesHtml(content, withoutMerge) {
+    const parts = sections(content.body).filter(s => !withoutMerge || !isMergeLine(s)).map(s => {
+      if (s.tag) return `<p><span class="tagline">${escapeHtml(s.text)}</span></p>`;
+      if (s.trigger) {
+        const price = s.cost ? `<span class="price">${ICONS[s.cost.icon] ? icon(ICONS[s.cost.icon], "") : ""}${s.cost.amount}${ICONS[s.cost.icon] ? "" : " " + escapeHtml(s.cost.icon)}</span>` : "";
+        const head = `<span class="trigger${s.blessing ? " blessing" : ""}">${escapeHtml(s.trigger)}</span>${price}`;
+        if (!s.text) return `<p>${head}</p>`;
+        return plain(s.text).length <= 8 ? `<p>${head} ${rich(s.text, content)}</p>` : `<p>${head}<br>${rich(s.text, content)}</p>`;
+      }
+      return `<p>${rich(s.text, content)}</p>`;
+    });
+    return parts.join("");
+  }
+  const scalingNote = c => !c.body.includes("[u]") ? "" :
+    `<p class="note">${c.kind === "AUGMENT" ? "Gold values grow with your Aura and Engage bonuses." : "Underlined values scale when golden."}</p>`;
+
+  // --- The catalogue as the gallery lists it (GalleryEntries) ---------------------------
+  function unitContent(u) {
+    const body = readable(u.Description);
+    return { kind: "UNIT", title: u.Name, body, faction: u.Faction || "", icon: factionIcon(u.Faction || ""), tier: u.Level,
+      rank: u.Prismatic ? "Prismatic" : u.Golden ? "Golden" : "", power: u.Power, health: Math.max(0, u.Health), speed: u.Speed,
+      shield: u.Shield, keywords: keywordsFor(body, u.Speed), tags: [] };
+  }
+  const entries = { units: [], heroes: [], augments: [], spells: [] };
+  for (const u of G.Units || []) {
+    const factions = (u.Unit.Faction || "").split(" / ").filter(Boolean);
+    const section = u.Origin === "Shop" ? "Tier " + numeral(u.Unit.Level) : u.Origin === "Prismatic" ? PRISMATIC : OTHER;
+    entries.units.push({ cat: "units", key: u.Unit.Art, name: u.Unit.Name, art: "Cards/" + u.Unit.Art, section, level: u.Unit.Level,
+      contentId: u.Unit.ContentId || "", factions: factions.length ? factions : [UNALIGNED], recipe: u.Recipe || [],
+      base: unitContent(u.Unit), golden: u.Golden && u.Golden.Golden ? unitContent(u.Golden) : null });
+  }
+  const rank = e => e.section === OTHER ? 2 : e.section === PRISMATIC ? 1 : 0;
+  const ordinal = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  const byName = (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  entries.units.sort((a, b) => rank(a) - rank(b)
+    || (a.section === OTHER ? 0 : a.level) - (b.section === OTHER ? 0 : b.level)
+    || ordinal(a.section === PRISMATIC ? "" : a.factions[0] === UNALIGNED ? "~" : a.factions[0], b.section === PRISMATIC ? "" : b.factions[0] === UNALIGNED ? "~" : b.factions[0])
+    || (a.section === OTHER ? a.level : 0) - (b.section === OTHER ? b.level : 0) || byName(a, b));
+  const hero = (h, epic) => {
+    const body = readable(h.Description);
+    return { cat: "heroes", key: h.Art, name: h.Name, art: "Heroes/" + h.Art, section: epic ? EPIC : "", factions: [],
+      base: { kind: epic ? "EPIC HERO" : "HERO", title: h.Name, body, keywords: keywordsFor(body), tags: [] }, golden: null };
+  };
+  entries.heroes = [...(G.Heroes || []).map(h => hero(h, false)), ...(G.EpicHeroes || []).map(h => hero(h, true))];
+  entries.augments = [...(G.Augments || [])].sort((a, b) => a.Tier - b.Tier || a.Augment.Name.toLowerCase().localeCompare(b.Augment.Name.toLowerCase())).map(a => {
+    const body = readable(a.Augment.Description);
+    return { cat: "augments", key: a.Augment.Art, name: a.Augment.Name, art: "Augments/" + a.Augment.Art, section: "Tier " + numeral(a.Tier), level: a.Tier, factions: [],
+      base: { kind: "AUGMENT", title: a.Augment.Name, body, tier: a.Tier, keywords: keywordsFor(a.Augment.Description), tags: a.Offered ? [a.Offered] : [] }, golden: null };
+  });
+  entries.spells = [...(G.Spells || [])].sort((a, b) => a.Tier - b.Tier || (a.Requirement.length > 0) - (b.Requirement.length > 0) || a.Name.toLowerCase().localeCompare(b.Name.toLowerCase())).map(s => {
+    const body = readable(s.Description + (s.Requirement ? `\n${s.Requirement}.` : ""));
+    return { cat: "spells", key: s.Art, name: s.Name, art: "Spells/" + s.Art, section: "Tier " + numeral(s.Tier), level: s.Tier, factions: [], cost: s.Cost,
+      base: { kind: "SPELL · TIER " + s.Tier, title: s.Name, body, keywords: keywordsFor(s.Description), tags: [], cost: `Costs ${s.Cost} gold` }, golden: null };
+  });
+  const byContentId = new Map(entries.units.filter(e => e.contentId).map(e => [e.contentId, e]));
+  // The prismatics a unit is an ingredient of.
+  const madeFrom = e => e.contentId ? entries.units.filter(p => p.recipe.includes(e.contentId)) : [];
+  for (const list of Object.values(entries)) for (const e of list) {
+    e.prismatic = e.section === PRISMATIC;
+    e.search = [e.name, e.factions.join(" "), plain(e.base.body), e.golden ? plain(e.golden.body) : "", ...(e.base.tags || [])].join("\n").toLowerCase();
+  }
+
+  const TABS = [["units", "Units", entries.units.length], ["heroes", "Heroes", entries.heroes.length], ["augments", "Augments", entries.augments.length],
+    ["spells", "Spells", entries.spells.length], ["keywords", "Keywords", GLOSSARY.length]];
+  const artUrl = (folder, key) => SITE.art && SITE.art[key] ? `${folder}/${key}.webp?v=${SITE.art[key]}` : null;
+  const picture = (key, alt, lazy = true) => {
+    const src = artUrl("thumbs", key);
+    return src ? `<img src="${src}" alt="${escapeHtml(alt)}"${lazy ? ' loading="lazy" decoding="async"' : ""}>` : '<span class="blank"></span>';
+  };
+
+  // --- State ------------------------------------------------------------------------------
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { } } };
+  const state = { cat: "units", search: "", faction: "", tier: 0, prismatic: false, golden: false, view: store.get("pact-gallery-view") === "text" ? "text" : "cards", shown: [], page: null };
+
+  function pretty(tag) {
+    if (!/^\d{8}-\d{6}$/.test(tag)) return tag;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${+tag.slice(6, 8)} ${months[Math.min(11, Math.max(0, +tag.slice(4, 6) - 1))]} ${tag.slice(0, 4)}, ${tag.slice(9, 11)}:${tag.slice(11, 13)}`;
+  }
+  $("patch").innerHTML = `Patch <b>${escapeHtml(pretty(SITE.tag || ""))}</b><br>Rules ${escapeHtml(SITE.rulesRevision || "")}`;
+  $("footer").textContent = `Card text and paintings from patch ${pretty(SITE.tag || "")}, as the game shows them.`;
+  document.title = `Prismatic Pact Gallery · ${pretty(SITE.tag || "")}`;
+  // A phone's search field is short.
+  const narrow = window.matchMedia("(max-width: 760px)");
+  const placeholder = () => { $("search").placeholder = narrow.matches ? "Search" : "Search a name or an effect"; };
+  placeholder(); narrow.addEventListener("change", placeholder);
+
+  // --- The list ---------------------------------------------------------------------------
+  function renderTabs() {
+    $("tabs").innerHTML = TABS.map(([id, label, n]) => `<button type="button" class="tab" role="tab" data-cat="${id}" aria-selected="${state.cat === id}">${label}<span>${n}</span></button>`).join("");
+  }
+  function renderFilters() {
+    const all = entries[state.cat] || [];
+    let html = "";
+    if (state.cat === "units") {
+      const present = new Set(all.flatMap(e => e.factions));
+      const order = [...FACTIONS.filter(f => present.has(f)), ...[...present].filter(f => !FACTIONS.includes(f)).sort()];
+      html += `<div class="chips" aria-label="Faction">${chip("faction", "", "All factions", state.faction === "")}${order.map(f => {
+        const ic = f === UNALIGNED ? null : factionIcon(f);
+        return chip("faction", f, (ic ? icon(ic, "") : "") + escapeHtml(f), state.faction === f);
+      }).join("")}</div>`;
+    }
+    if (state.cat !== "heroes" && state.cat !== "keywords") {
+      const levels = [...new Set(all.map(e => e.level).filter(l => l > 0))].sort((a, b) => a - b);
+      html += `<div class="chips" aria-label="Tier">${chip("tier", 0, "All tiers", state.tier === 0)}${levels.map(l => chip("tier", l, numeral(l), state.tier === l, "tier")).join("")}${
+        state.cat === "units" ? chip("prismatic", 1, PRISMATIC, state.prismatic, "prism") : ""}</div>`;
+    }
+    $("filters").innerHTML = html;
+  }
+  const chip = (kind, value, label, on, cls = "") => `<button type="button" class="chip ${cls}" data-${kind}="${escapeHtml(String(value))}" aria-pressed="${on}">${label}</button>`;
+
+  function matches(e) {
+    return (!state.search || state.search.split(/\s+/).every(w => e.search.includes(w)))
+      && (!state.faction || e.factions.includes(state.faction))
+      && (!state.tier || e.level === state.tier)
+      && (!state.prismatic || e.prismatic);
+  }
+  // The content a tile and a row show: the golden form while Golden is on.
+  const shownContent = e => state.golden && e.golden ? e.golden : e.base;
+
+  function tile(e, i) {
+    const c = shownContent(e);
+    const cls = ["tile", c.rank === "Golden" ? "golden" : "", e.prismatic ? "prismatic" : ""].join(" ");
+    let marks = "";
+    if (e.cat === "units") {
+      marks += c.tier > 0 ? `<span class="pip">${numeral(c.tier)}</span>` : "";
+      marks += c.icon ? `<span class="fac" style="--tint:${TINTS[c.icon] || "var(--gold)"}">${icon(c.icon, "")}</span>` : "";
+      marks += `<span class="stat-row"><span class="stat pow" title="Power">${c.power}</span><span class="stat hp" title="Health">${c.health}</span></span>`;
+    } else if (e.cat === "augments") marks += `<span class="pip">${numeral(e.level)}</span>`;
+    else if (e.cat === "spells") marks += `<span class="pip">${numeral(e.level)}</span><span class="coin">${icon("Gold", "")}${e.cost}</span>`;
+    return `<button type="button" class="${cls}" data-i="${i}" aria-label="${escapeHtml(e.name)}"><span class="face">${picture(e.art, e.name)}${marks}</span><span class="tile-name">${escapeHtml(e.name)}</span></button>`;
+  }
+  function kicker(e, c) {
+    const what = (c.kind === "UNIT" ? c.faction || "Unit" : c.kind) + (c.tier > 0 ? " · Tier " + numeral(c.tier) : "");
+    const tint = c.icon ? ` style="color:${TINTS[c.icon]}"` : "";
+    return `<div class="kicker">${c.icon ? icon(c.icon, "") : ""}<span${tint}>${escapeHtml(what)}</span>${c.rank ? `<span class="rank-${c.rank.toLowerCase()}">· ${c.rank}</span>` : ""}</div>`;
+  }
+  function statline(c) {
+    if (c.kind !== "UNIT") return "";
+    return `<div class="statline"><span class="p"><b>${c.power}</b>Power</span><span class="h"><b>${c.health}</b>Health</span>${
+      c.speed !== 100 ? `<span><b>${c.speed}</b>Speed</span>` : ""}${c.shield > 0 ? `<span><b>${c.shield}</b>Shield</span>` : ""}</div>`;
+  }
+  function tagsHtml(c) {
+    const tags = [...(c.tags || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`), c.cost ? `<span class="tag cost">${escapeHtml(c.cost)}</span>` : ""].join("");
+    return tags ? `<div class="tags">${tags}</div>` : "";
+  }
+  function row(e, i) {
+    const c = shownContent(e);
+    const cls = ["row", c.rank === "Golden" ? "golden" : "", e.prismatic ? "prismatic" : "", e.cat === "augments" || e.cat === "spells" ? "square-art" : ""].join(" ");
+    return `<button type="button" class="${cls}" data-i="${i}"><span class="face">${picture(e.art, e.name)}</span><span>${kicker(e, c)}<h3>${escapeHtml(e.name)}</h3>${statline(c)}<span class="rules" style="display:block">${rulesHtml(c, false)}</span>${tagsHtml(c)}</span></button>`;
+  }
+
+  function renderList() {
+    $("view").hidden = $("golden").hidden = false;
+    if (state.cat === "keywords") {
+      const shown = GLOSSARY.filter(k => !state.search || (k.keyword + "\n" + k.meaning).toLowerCase().includes(state.search));
+      $("count").textContent = shown.length === GLOSSARY.length ? "" : `${shown.length} of ${GLOSSARY.length} shown`;
+      $("view").hidden = $("golden").hidden = true;
+      $("list").innerHTML = shown.length ? `<div class="keywords">${shown.map(k => `<div class="keyword"><h3>${escapeHtml(k.keyword)}</h3><p>${escapeHtml(k.meaning)}</p></div>`).join("")}</div>` : '<p class="empty">Nothing here matches.</p>';
+      return;
+    }
+    $("golden").hidden = state.cat !== "units";
+    const all = entries[state.cat];
+    state.shown = all.filter(matches);
+    $("count").textContent = state.shown.length === all.length ? "" : `${state.shown.length} of ${all.length} shown`;
+    if (!state.shown.length) { $("list").innerHTML = '<p class="empty">Nothing here matches.</p>'; return; }
+    const square = state.cat === "augments" || state.cat === "spells";
+    let html = "", i = 0;
+    const groups = [];
+    for (const e of state.shown) { const last = groups[groups.length - 1]; if (last && last.name === e.section) last.items.push(e); else groups.push({ name: e.section, items: [e] }); }
+    for (const g of groups) {
+      if (g.name) html += `<h2 class="section-h">${escapeHtml(g.name)} <span>${g.items.length}</span></h2>`;
+      html += state.view === "text"
+        ? `<div class="rows">${g.items.map(e => row(e, i++)).join("")}</div>`
+        : `<div class="grid${square ? " square" : ""}">${g.items.map(e => tile(e, i++)).join("")}</div>`;
+    }
+    $("list").innerHTML = html;
+  }
+  function render() {
+    renderTabs(); renderFilters(); renderList();
+    $("golden").setAttribute("aria-pressed", state.golden);
+    for (const b of $("view").children) b.setAttribute("aria-pressed", b.dataset.view === state.view);
+  }
+
+  // --- A card's page ------------------------------------------------------------------------
+  function mini(e, golden, here) {
+    const c = golden && e.golden ? e.golden : e.base;
+    const cls = ["mini", golden && e.golden ? "golden" : "", e.prismatic ? "prismatic" : "", here ? "here" : ""].join(" ");
+    return `<button type="button" class="${cls}" data-goto="${e.cat}/${escapeHtml(e.key)}${golden && e.golden ? "/golden" : ""}"${here ? ' disabled aria-current="true"' : ""}><span class="face">${picture(e.art, e.name, false)}</span>${escapeHtml(c.title)}</button>`;
+  }
+  function mergeHtml(prismatic, current) {
+    const parts = prismatic.recipe.map(id => byContentId.get(id)).filter(Boolean);
+    if (!parts.length) return "";
+    return `<div class="merge"><div class="merge-h"><span>Prismatic merge</span><span>${parts.length === 2 ? "Both golden" : "All golden"}</span></div><div class="merge-row">${
+      parts.map(p => mini(p, true, p === current)).join('<span class="op">+</span>')}<span class="op">→</span>${mini(prismatic, false, prismatic === current)}</div></div>`;
+  }
+  function renderPage() {
+    const page = $("page");
+    if (!state.page) { page.hidden = true; page.innerHTML = ""; document.body.classList.remove("locked"); return; }
+    const e = state.page.entry, golden = state.page.golden && !!e.golden;
+    const c = golden ? e.golden : e.base;
+    const nav = state.shown.includes(e) ? state.shown : entries[e.cat];
+    const at = nav.indexOf(e);
+    const merges = e.cat === "units" ? (e.recipe.length ? [e] : madeFrom(e)) : [];
+    const illusSrc = artUrl("art", e.art);
+    const illusCls = ["illus", c.rank === "Golden" ? "golden" : "", e.prismatic ? "prismatic" : ""].join(" ");
+    page.innerHTML = `<div class="sheet">
+      <div class="sheet-bar">
+        <button type="button" class="icon-btn" data-step="-1" aria-label="Previous" title="Previous (←)">‹</button>
+        <span class="pos">${at + 1} / ${nav.length}</span>
+        <button type="button" class="icon-btn" data-step="1" aria-label="Next" title="Next (→)">›</button>
+        <span class="grow"></span>
+        ${e.golden ? `<div class="seg" role="group" aria-label="Form"><button type="button" data-form="base" aria-pressed="${!golden}">Base</button><button type="button" data-form="golden" aria-pressed="${golden}" title="Switch (G)">Golden</button></div>` : ""}
+        <button type="button" class="icon-btn" data-close aria-label="Close" title="Close (Esc)">×</button>
+      </div>
+      <div class="sheet-body">
+        <figure class="${illusCls}">${illusSrc ? `<img src="${illusSrc}" alt="${escapeHtml(e.name)}">` : '<span class="blank"></span>'}</figure>
+        <div class="page-text">
+          ${kicker(e, c)}
+          <h2 id="page-title">${escapeHtml(c.title)}</h2>
+          ${statline(c)}
+          <div class="divider"></div>
+          <div class="rules">${rulesHtml(c, merges.length > 0)}</div>
+          ${scalingNote(c)}
+          ${merges.map(p => mergeHtml(p, e)).join("")}
+          ${tagsHtml(c)}
+          ${c.keywords.length ? `<div class="glossary"><h4>KEYWORDS</h4>${c.keywords.map(k => `<div class="gloss"><b>${escapeHtml(k.keyword)}</b> · ${escapeHtml(k.meaning)}</div>`).join("")}</div>` : ""}
+        </div>
+      </div>
+    </div>`;
+    const wasHidden = page.hidden;
+    page.hidden = false;
+    document.body.classList.add("locked");
+    page.querySelector(".sheet-body").scrollTop = 0;
+    if (wasHidden) page.querySelector("[data-close]").focus({ preventScroll: true });
+  }
+
+  // --- Addresses: #units, #units/<art>, #units/<art>/golden -------------------------------
+  const hashFor = (e, golden) => e ? `#${e.cat}/${encodeURIComponent(e.key)}${golden && e.golden ? "/golden" : ""}` : `#${state.cat}`;
+  function fromHash() {
+    const [cat, key, form] = decodeURIComponent(location.hash.slice(1)).split("/");
+    if (TABS.some(t => t[0] === cat) && cat !== state.cat) { state.cat = cat; state.faction = ""; state.tier = 0; state.prismatic = false; }
+    const e = key && entries[cat] ? entries[cat].find(x => x.key === key) : null;
+    state.page = e ? { entry: e, golden: form === "golden" } : null;
+    render(); renderPage();
+  }
+  // Opening a page adds a step to the browser's history, so Back closes it; moving between
+  // pages, forms and tabs replaces it.
+  function openPage(e, golden, push) {
+    state.page = { entry: e, golden: golden && !!e.golden };
+    if (push) history.pushState({ page: true }, "", hashFor(e, golden)); else history.replaceState(history.state, "", hashFor(e, golden));
+    if (push && state.cat !== e.cat) { state.cat = e.cat; state.faction = ""; state.tier = 0; state.prismatic = false; render(); }
+    renderPage();
+  }
+  function closePage() {
+    if (!state.page) return;
+    if (history.state && history.state.page) { history.back(); return; }
+    state.page = null; history.replaceState(null, "", hashFor(null)); renderPage();
+  }
+  function step(by) {
+    const e = state.page.entry, nav = state.shown.includes(e) ? state.shown : entries[e.cat];
+    openPage(nav[(nav.indexOf(e) + by + nav.length) % nav.length], state.page.golden, false);
+  }
+
+  // --- Input ----------------------------------------------------------------------------------
+  $("tabs").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-cat]"); if (!b || b.dataset.cat === state.cat) return;
+    state.cat = b.dataset.cat; state.faction = ""; state.tier = 0; state.prismatic = false;
+    history.replaceState(null, "", hashFor(null)); render(); window.scrollTo({ top: 0 });
+  });
+  $("filters").addEventListener("click", ev => {
+    const b = ev.target.closest(".chip"); if (!b) return;
+    if (b.dataset.faction !== undefined) state.faction = b.dataset.faction;
+    else if (b.dataset.tier !== undefined) state.tier = +b.dataset.tier;
+    else if (b.dataset.prismatic !== undefined) state.prismatic = !state.prismatic;
+    renderFilters(); renderList();
+  });
+  let typing = 0;
+  $("search").addEventListener("input", ev => {
+    clearTimeout(typing);
+    typing = setTimeout(() => { state.search = ev.target.value.trim().toLowerCase(); renderList(); }, 90);
+  });
+  $("view").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-view]"); if (!b) return;
+    state.view = b.dataset.view; store.set("pact-gallery-view", state.view); render();
+  });
+  $("golden").addEventListener("click", () => { state.golden = !state.golden; render(); });
+  $("list").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-i]"); if (!b) return;
+    const e = state.shown[+b.dataset.i];
+    if (e) openPage(e, state.golden, true);
+  });
+  $("page").addEventListener("click", ev => {
+    if (ev.target === ev.currentTarget || ev.target.closest("[data-close]")) { closePage(); return; }
+    const s = ev.target.closest("[data-step]"); if (s) { step(+s.dataset.step); return; }
+    const f = ev.target.closest("[data-form]"); if (f) { openPage(state.page.entry, f.dataset.form === "golden", false); return; }
+    const g = ev.target.closest("[data-goto]");
+    if (g) {
+      const [cat, key, form] = g.dataset.goto.split("/");
+      const e = entries[cat].find(x => x.key === key);
+      if (e) openPage(e, form === "golden", true);
+    }
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.matches && ev.target.matches("input")) { if (ev.key === "Escape") ev.target.blur(); return; }
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (state.page) {
+      if (ev.key === "Escape") closePage();
+      else if (ev.key === "ArrowLeft") step(-1);
+      else if (ev.key === "ArrowRight") step(1);
+      else if ((ev.key === "g" || ev.key === "G") && state.page.entry.golden) openPage(state.page.entry, !state.page.golden, false);
+      else return;
+      ev.preventDefault();
+    } else if (ev.key === "/") { ev.preventDefault(); $("search").focus(); }
+    else if ((ev.key === "g" || ev.key === "G") && state.cat === "units") { state.golden = !state.golden; render(); }
+  });
+  window.addEventListener("popstate", fromHash);
+
+  fromHash();
+})();
+</script>
+</body>
+</html>

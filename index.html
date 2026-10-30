@@ -72,6 +72,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 14px 24px 60px; }
 .chip[aria-pressed="true"] { color: var(--ink); background: var(--gold); border-color: var(--gold); }
 .chip.tier { font-family: var(--display); font-weight: 700; min-width: 40px; justify-content: center; }
 .chip.prism[aria-pressed="true"] { background: var(--spectrum); border-color: transparent; color: #101826; }
+.chip.unlock { margin-left: 8px; }
 .count { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
 .count:empty { display: none; }
 
@@ -275,8 +276,11 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   const TINTS = { ManaIcon: "#7fa8ff", DevotionIcon: "#e0607e", StardustIcon: "#7fe8ff", ShadowEssenceIcon: "#b48cf0", GrowthIcon: "#8fd67a",
     PowerIcon: "#f2d26b", CultivationIcon: "#9bd97a", VoltageIcon: "#ffd75a" };
   // GalleryEntries: the faction filter's order; units with none are Unaligned.
-  const FACTIONS = ["Mage", "Cultist", "Sylvan", "Spirit", "Dragon", "Dragonkin", "Ninja", "Cloudstriker", "Letter", "Unaligned"];
+  const FACTIONS = ["Mage", "Cultist", "Sylvan", "Spirit", "Dragon", "Dragonkin", "Ninja", "Cloudstriker", "Unaligned"];
   const UNALIGNED = "Unaligned", PRISMATIC = "Prismatic", OTHER = "Summoned and evolved", EPIC = "Epic heroes · from the hero gallery spell";
+  // GalleryEntries.Unlock: factions only an augment brings into the shop show under their own
+  // filter and nowhere else, search included.
+  const UNLOCKED = "Augment factions", LETTERS = "Letters · from Flaming Quill", NIHILITY = "Nihility · from Descend Into Nothingness";
   const numeral = n => ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][n] || String(n);
 
   const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -381,6 +385,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     const section = u.Origin === "Shop" ? "Tier " + numeral(u.Unit.Level) : u.Origin === "Prismatic" ? PRISMATIC : OTHER;
     entries.units.push({ cat: "units", key: u.Unit.Art, name: u.Unit.Name, art: "Cards/" + u.Unit.Art, section, level: u.Unit.Level,
       contentId: u.Unit.ContentId || "", factions: factions.length ? factions : [UNALIGNED], recipe: u.Recipe || [],
+      unlock: factions.includes("Letter") ? LETTERS : /^NihilityUnit\d+$/.test(u.Unit.Art) ? NIHILITY : "",
       base: unitContent(u.Unit), golden: u.Golden && u.Golden.Golden ? unitContent(u.Golden) : null });
   }
   const rank = e => e.section === OTHER ? 2 : e.section === PRISMATIC ? 1 : 0;
@@ -414,7 +419,9 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     e.search = [e.name, e.factions.join(" "), plain(e.base.body), e.golden ? plain(e.golden.body) : "", ...(e.base.tags || [])].join("\n").toLowerCase();
   }
 
-  const TABS = [["units", "Units", entries.units.length], ["heroes", "Heroes", entries.heroes.length], ["augments", "Augments", entries.augments.length],
+  // The list a filter works in: the units augments unlock, or everything else.
+  const scope = (cat, unlocked) => entries[cat].filter(e => !!e.unlock === unlocked);
+  const TABS = [["units", "Units", scope("units", false).length], ["heroes", "Heroes", entries.heroes.length], ["augments", "Augments", entries.augments.length],
     ["spells", "Spells", entries.spells.length], ["keywords", "Keywords", GLOSSARY.length]];
   const artUrl = (folder, key) => SITE.art && SITE.art[key] ? `${folder}/${key}.webp?v=${SITE.art[key]}` : null;
   const picture = (key, alt, lazy = true) => {
@@ -447,12 +454,12 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     const all = entries[state.cat] || [];
     let html = "";
     if (state.cat === "units") {
-      const present = new Set(all.flatMap(e => e.factions));
+      const present = new Set(scope("units", false).flatMap(e => e.factions));
       const order = [...FACTIONS.filter(f => present.has(f)), ...[...present].filter(f => !FACTIONS.includes(f)).sort()];
       html += `<div class="chips" aria-label="Faction">${chip("faction", "", "All factions", state.faction === "")}${order.map(f => {
         const ic = f === UNALIGNED ? null : factionIcon(f);
         return chip("faction", f, (ic ? icon(ic, "") : "") + escapeHtml(f), state.faction === f);
-      }).join("")}</div>`;
+      }).join("")}${chip("faction", UNLOCKED, UNLOCKED, state.faction === UNLOCKED, "unlock")}</div>`;
     }
     if (state.cat !== "heroes" && state.cat !== "keywords") {
       const levels = [...new Set(all.map(e => e.level).filter(l => l > 0))].sort((a, b) => a - b);
@@ -465,7 +472,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
 
   function matches(e) {
     return (!state.search || state.search.split(/\s+/).every(w => e.search.includes(w)))
-      && (!state.faction || e.factions.includes(state.faction))
+      && (!state.faction || state.faction === UNLOCKED || e.factions.includes(state.faction))
       && (!state.tier || e.level === state.tier)
       && (!state.prismatic || e.prismatic);
   }
@@ -515,14 +522,15 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
       return;
     }
     $("golden").hidden = state.cat !== "units";
-    const all = entries[state.cat];
-    state.shown = all.filter(matches);
+    const unlocked = state.faction === UNLOCKED;
+    const all = scope(state.cat, unlocked);
+    state.shown = all.filter(matches).sort((a, b) => ordinal(a.unlock || "", b.unlock || ""));
     $("count").textContent = state.shown.length === all.length ? "" : `${state.shown.length} of ${all.length} shown`;
     if (!state.shown.length) { $("list").innerHTML = '<p class="empty">Nothing here matches.</p>'; return; }
     const square = state.cat === "augments" || state.cat === "spells";
     let html = "", i = 0;
     const groups = [];
-    for (const e of state.shown) { const last = groups[groups.length - 1]; if (last && last.name === e.section) last.items.push(e); else groups.push({ name: e.section, items: [e] }); }
+    for (const e of state.shown) { const name = unlocked ? e.unlock : e.section, last = groups[groups.length - 1]; if (last && last.name === name) last.items.push(e); else groups.push({ name, items: [e] }); }
     for (const g of groups) {
       if (g.name) html += `<h2 class="section-h">${escapeHtml(g.name)} <span>${g.items.length}</span></h2>`;
       html += state.view === "text"
@@ -538,6 +546,8 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
   }
 
   // --- A card's page ------------------------------------------------------------------------
+  // The arrows turn through what the list shows; a card it doesn't show, through its own scope.
+  const navFor = e => state.shown.includes(e) ? state.shown : scope(e.cat, !!e.unlock);
   function mini(e, golden, here) {
     const c = golden && e.golden ? e.golden : e.base;
     const cls = ["mini", golden && e.golden ? "golden" : "", e.prismatic ? "prismatic" : "", here ? "here" : ""].join(" ");
@@ -554,7 +564,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     if (!state.page) { page.hidden = true; page.innerHTML = ""; document.body.classList.remove("locked"); return; }
     const e = state.page.entry, golden = state.page.golden && !!e.golden;
     const c = golden ? e.golden : e.base;
-    const nav = state.shown.includes(e) ? state.shown : entries[e.cat];
+    const nav = navFor(e);
     const at = nav.indexOf(e);
     const merges = e.cat === "units" ? (e.recipe.length ? [e] : madeFrom(e)) : [];
     const illusSrc = artUrl("art", e.art);
@@ -616,7 +626,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; color: var(--d
     state.page = null; history.replaceState(null, "", hashFor(null)); renderPage();
   }
   function step(by) {
-    const e = state.page.entry, nav = state.shown.includes(e) ? state.shown : entries[e.cat];
+    const e = state.page.entry, nav = navFor(e);
     openPage(nav[(nav.indexOf(e) + by + nav.length) % nav.length], state.page.golden);
   }
 
